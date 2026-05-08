@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}Search — Snickr{% endblock %}
+
+{% block body %}
+<div style="display:flex; height:100vh; flex-direction:column;">
+  <div class="topbar">
+    <div class="topbar-title">🔍 Search Messages</div>
+    <div class="topbar-right">
+      <a href="/workspaces" class="btn btn-ghost btn-sm">← Workspaces</a>
+      <a href="/logout" class="btn btn-ghost btn-sm">Sign out</a>
+    </div>
+  </div>
+
+  <div class="content">
+    <div style="max-width:720px; margin:0 auto;">
+
+      <!-- Search form -->
+      <form method="GET" action="/search" style="display:flex; gap:10px; margin-bottom:28px; flex-wrap:wrap;">
+        <input type="text" name="q" value="{{ keyword }}"
+               placeholder="Search for a keyword…"
+               style="flex:1; min-width:200px;"
+               autofocus>
+        <select name="workspace_id" style="width:220px;">
+          <option value="">All workspaces</option>
+          {% for ws in workspaces %}
+            <option value="{{ ws.workspace_id }}" {% if selected_workspace == ws.workspace_id %}selected{% endif %}>
+              {{ ws.name }}
+            </option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">Search</button>
+      </form>
+
+      {% if keyword %}
+        <div style="font-size:13px; color:var(--text-dim); margin-bottom:16px;">
+          {% if results %}
+            {{ results|length }} result{% if results|length != 1 %}s{% endif %} for
+            <strong style="color:var(--text);">"{{ keyword }}"</strong>
+          {% else %}
+            No results found for <strong style="color:var(--text);">"{{ keyword }}"</strong>
+          {% endif %}
+        </div>
+
+        {% for r in results %}
+          <a href="/channels/{{ r.channel_id }}" style="display:block; margin-bottom:12px; text-decoration:none;">
+            <div class="card" style="cursor:pointer; transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--highlight)'" onmouseout="this.style.borderColor='var(--border)'">
+              <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                <span style="font-size:13px; color:var(--text-dim);">{{ r.workspace_name }}</span>
+                <span style="color:var(--border);">›</span>
+                <span style="font-size:13px; color:var(--text-dim);">#{{ r.channel_name }}</span>
+                <span style="margin-left:auto; font-size:11px; color:var(--text-dim); font-family:var(--mono);">
+                  {{ r.posted_at.strftime('%b %d, %Y %I:%M %p') }}
+                </span>
+              </div>
+              <div style="display:flex; gap:10px; align-items:flex-start;">
+                <div style="width:32px; height:32px; border-radius:6px; background:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px; color:#fff; flex-shrink:0;">
+                  {{ r.username[0].upper() }}
+                </div>
+                <div>
+                  <div style="font-weight:600; font-size:14px; color:var(--text-head); margin-bottom:4px;">@{{ r.username }}</div>
+                  <div style="font-size:14px; color:var(--text); line-height:1.5;">
+                    {{ r.body | e | replace(keyword, '<mark style="background:rgba(17,100,163,0.3); color:#6db3f2; border-radius:2px; padding:0 2px;">' ~ keyword ~ '</mark>') | safe }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </a>
+        {% endfor %}
+      {% else %}
+        <div style="text-align:center; padding:60px 20px; color:var(--text-dim);">
+          <div style="font-size:40px; margin-bottom:12px;">🔍</div>
+          <div style="font-size:16px; color:var(--text); margin-bottom:8px;">Search your messages</div>
+          <div style="font-size:14px;">Find any message across all your channels and workspaces.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

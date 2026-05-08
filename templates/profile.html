@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Profile — Snickr{% endblock %}
+
+{% block body %}
+<div class="auth-wrap">
+  <div class="auth-box" style="max-width:480px;">
+    <div style="margin-bottom:24px;">
+      <a href="/workspaces" style="font-size:13px; color:var(--text-dim);">← Back to workspaces</a>
+    </div>
+    <div class="auth-logo" style="font-size:22px;">Your Profile</div>
+    <div class="auth-sub">Manage your account details.</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flash-list">
+          {% for cat, msg in messages %}
+            <li class="flash {{ cat }}">{{ msg }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Read-only info -->
+    <div class="card" style="margin-bottom:20px;">
+      <div style="display:flex; gap:14px; align-items:center;">
+        <div style="width:52px; height:52px; border-radius:10px; background:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:22px; color:#fff; flex-shrink:0;">
+          {{ user.username[0].upper() }}
+        </div>
+        <div>
+          <div style="font-size:16px; font-weight:600; color:var(--text-head);">@{{ user.username }}</div>
+          <div style="font-size:13px; color:var(--text-dim);">{{ user.email }}</div>
+          <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">
+            Member since {{ user.created_at.strftime('%B %Y') }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Editable fields -->
+    <form method="POST">
+      <div class="form-group">
+        <label>Nickname</label>
+        <input type="text" name="nickname" value="{{ user.nickname or '' }}" placeholder="Display name">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+        Save Changes
+      </button>
+    </form>
+
+    <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); text-align:center;">
+      <a href="/logout" class="btn btn-ghost btn-sm">Sign out</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

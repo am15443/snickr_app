@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Edit Message — Snickr{% endblock %}
+
+{% block body %}
+<div class="auth-wrap">
+  <div class="auth-box" style="max-width:540px;">
+    <div style="margin-bottom:24px;">
+      <a href="/channels/{{ msg.channel_id }}"
+         style="font-size:13px; color:var(--text-dim);">← Back to channel</a>
+    </div>
+    <div class="auth-logo" style="font-size:22px;">Edit Message</div>
+    <div class="auth-sub">Fix your typo below.</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flash-list">
+          {% for cat, msg_flash in messages %}
+            <li class="flash {{ cat }}">{{ msg_flash }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+      <div class="form-group">
+        <label>Message</label>
+        <textarea name="body" rows="4" style="resize:vertical;">{{ msg.body | e }}</textarea>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a href="/channels/{{ msg.channel_id }}" class="btn btn-ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

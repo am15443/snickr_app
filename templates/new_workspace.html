@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}New Workspace — Snickr{% endblock %}
+
+{% block body %}
+<div class="auth-wrap">
+  <div class="auth-box" style="max-width:480px;">
+    <div style="margin-bottom:24px;">
+      <a href="/workspaces" style="font-size:13px; color:var(--text-dim);">← Back to workspaces</a>
+    </div>
+    <div class="auth-logo" style="font-size:22px;">Create a Workspace</div>
+    <div class="auth-sub">Bring your team together in one place.</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flash-list">
+          {% for cat, msg in messages %}
+            <li class="flash {{ cat }}">{{ msg }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+      <div class="form-group">
+        <label>Workspace Name</label>
+        <input type="text" name="name" placeholder="e.g. Acme Corp" required autofocus>
+      </div>
+      <div class="form-group">
+        <label>Description <span style="color:var(--text-dim); font-size:11px;">(optional)</span></label>
+        <textarea name="description" placeholder="What is this workspace for?" rows="3" style="resize:vertical;"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+        Create Workspace
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

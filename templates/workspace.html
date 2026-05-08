@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% block title %}{{ ws.name }} — Snickr{% endblock %}
+
+{% block body %}
+<div style="display:flex; height:100vh;">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-workspace-name">{{ ws.name }}</div>
+      <div class="sidebar-user">@{{ session.username }}</div>
+    </div>
+
+    <!-- Channel invitations -->
+    {% if channel_invites %}
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Invitations</div>
+        {% for inv in channel_invites %}
+          <a href="/channels/accept/{{ inv.invitation_id }}" class="sidebar-item" style="color:#6db3f2; font-size:13px;">
+            <span class="ch-icon">📨</span> #{{ inv.channel_name }}
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <!-- Channels -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Channels</div>
+      {% for ch in channels %}
+        <a href="/channels/{{ ch.channel_id }}" class="sidebar-item {% if not ch.is_member %}style="opacity:0.5;"{% endif %}">
+          <span class="ch-icon">{% if ch.type == 'direct' %}@{% elif ch.type == 'private' %}🔒{% else %}#{% endif %}</span>
+          {{ ch.name }}
+          {% if not ch.is_member and ch.type == 'public' %}
+            <span style="margin-left:auto; font-size:11px; color:var(--text-dim);">join</span>
+          {% endif %}
+        </a>
+      {% endfor %}
+    </div>
+
+    <div class="sidebar-actions">
+      <a href="/workspaces/{{ ws.workspace_id }}/channels/new" class="sidebar-link">
+        <span>+</span> Add a channel
+      </a>
+      {% if membership.is_admin %}
+        <a href="/workspaces/{{ ws.workspace_id }}/invite" class="sidebar-link">
+          <span>👤</span> Invite people
+        </a>
+      {% endif %}
+      <a href="/search?workspace_id={{ ws.workspace_id }}" class="sidebar-link">
+        <span>🔍</span> Search messages
+      </a>
+      <a href="/workspaces" class="sidebar-link" style="margin-top:8px; padding-top:10px; border-top:1px solid var(--border);">
+        ← All workspaces
+      </a>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">{{ ws.name }}</div>
+      <div class="topbar-right">
+        {% if ws.description %}
+          <span style="font-size:13px; color:var(--text-dim);">{{ ws.description }}</span>
+        {% endif %}
+        <div style="font-size:13px; color:var(--text-dim);">
+          Admins:
+          {% for a in admins %}
+            <span style="color:var(--text);">@{{ a.username }}</span>{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        </div>
+        <a href="/profile" class="btn btn-ghost btn-sm">Profile</a>
+        <a href="/logout" class="btn btn-ghost btn-sm">Sign out</a>
+      </div>
+    </div>
+
+    <div class="content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <ul class="flash-list">
+            {% for cat, msg in messages %}
+              <li class="flash {{ cat }}">{{ msg }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% endwith %}
+
+      <div style="max-width:600px; margin:40px auto; text-align:center; color:var(--text-dim);">
+        <div style="font-size:48px; margin-bottom:16px;">👈</div>
+        <div style="font-size:18px; font-weight:600; color:var(--text); margin-bottom:8px;">Select a channel</div>
+        <div style="margin-bottom:24px;">Pick a channel from the sidebar to start reading and posting messages.</div>
+        <a href="/workspaces/{{ ws.workspace_id }}/channels/new" class="btn btn-primary">
+          + Create a channel
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

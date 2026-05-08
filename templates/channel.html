@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+{% block title %}#{{ ch.name }} — Snickr{% endblock %}
+
+{% block head %}
+<style>
+  .msg-list { display: flex; flex-direction: column; gap: 0; }
+
+  .msg {
+    display: flex;
+    gap: 12px;
+    padding: 8px 16px;
+    transition: background 0.1s;
+    border-radius: var(--radius);
+  }
+  .msg:hover { background: var(--msg-hover); }
+
+  .msg-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+    color: #fff;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .msg-body { flex: 1; min-width: 0; }
+
+  .msg-header {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 3px;
+  }
+
+  .msg-author {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-head);
+  }
+
+  .msg-time {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
+
+  .msg-text {
+    font-size: 15px;
+    color: var(--text);
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .msg-input-area {
+    padding: 12px 16px 16px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .msg-input-box {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    transition: border-color 0.15s;
+  }
+  .msg-input-box:focus-within { border-color: var(--highlight); }
+
+  .msg-input-box textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-size: 15px;
+    color: var(--text);
+    min-height: 24px;
+    max-height: 160px;
+    font-family: var(--font);
+    padding: 0;
+  }
+
+  .msg-send-btn {
+    background: var(--highlight);
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+    transition: opacity 0.15s;
+  }
+  .msg-send-btn:hover { opacity: 0.85; }
+
+  .date-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .date-divider::before, .date-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div style="display:flex; height:100vh;">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-workspace-name">{{ ws.name }}</div>
+      <div class="sidebar-user">@{{ session.username }}</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Channels</div>
+      {% for sc in sidebar_channels %}
+        <a href="/channels/{{ sc.channel_id }}"
+           class="sidebar-item {% if sc.channel_id == ch.channel_id %}active{% endif %}">
+          <span class="ch-icon">{% if sc.type == 'direct' %}@{% elif sc.type == 'private' %}🔒{% else %}#{% endif %}</span>
+          {{ sc.name }}
+        </a>
+      {% endfor %}
+    </div>
+
+    <div class="sidebar-actions">
+      <a href="/workspaces/{{ ws.workspace_id }}/channels/new" class="sidebar-link">
+        <span>+</span> Add a channel
+      </a>
+      <a href="/bookmarks" class="sidebar-link">
+        <span>🔖</span> Bookmarks
+      </a>
+      {% if ws_membership and ws_membership.is_admin %}
+        <a href="/workspaces/{{ ws.workspace_id }}/invite" class="sidebar-link">
+          <span>👤</span> Invite people
+        </a>
+      {% endif %}
+      {% if ch.type != 'public' %}
+        <a href="/channels/{{ ch.channel_id }}/invite" class="sidebar-link">
+          <span>➕</span> Invite to channel
+        </a>
+      {% endif %}
+      <a href="/search?workspace_id={{ ws.workspace_id }}" class="sidebar-link">
+        <span>🔍</span> Search
+      </a>
+      <a href="/workspaces/{{ ws.workspace_id }}" class="sidebar-link" style="margin-top:8px; padding-top:10px; border-top:1px solid var(--border);">
+        ← {{ ws.name }}
+      </a>
+    </div>
+  </div>
+
+  <!-- Main channel area -->
+  <div class="main">
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="topbar-title">
+        {% if ch.type == 'direct' %}@{% elif ch.type == 'private' %}🔒 {% else %}#{% endif %}{{ ch.name }}
+      </div>
+      <span class="badge badge-{{ ch.type }}">{{ ch.type }}</span>
+      <div class="topbar-right">
+        {% if ch.type != 'public' %}
+          <a href="/channels/{{ ch.channel_id }}/invite" class="btn btn-ghost btn-sm">Invite</a>
+        {% endif %}
+        <a href="/channels/{{ ch.channel_id }}/bookmark" class="btn btn-ghost btn-sm">
+          🔖 Bookmark
+        </a>
+        <a href="/profile" class="btn btn-ghost btn-sm">Profile</a>
+        <a href="/logout" class="btn btn-ghost btn-sm">Sign out</a>
+      </div>
+    </div>
+
+    <!-- Flash messages -->
+    {% with flash_msgs = get_flashed_messages(with_categories=true) %}
+      {% if flash_msgs %}
+        <div style="padding:12px 16px;">
+          {% for cat, msg in flash_msgs %}
+            <div class="flash {{ cat }}">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- Messages -->
+    <div class="content" id="msg-scroll" style="padding:8px 0;">
+      {% if not messages %}
+        <div style="text-align:center; padding:60px 20px; color:var(--text-dim);">
+          <div style="font-size:40px; margin-bottom:12px;">💬</div>
+          <div style="font-weight:600; color:var(--text); margin-bottom:6px;">This is the very beginning of #{{ ch.name }}</div>
+          <div style="font-size:14px;">Be the first to send a message!</div>
+        </div>
+      {% else %}
+        <div class="msg-list">
+          {% set ns = namespace(last_date=None) %}
+          {% for msg in messages %}
+            {% set msg_date = msg.posted_at.strftime('%B %d, %Y') %}
+            {% if msg_date != ns.last_date %}
+              <div class="date-divider">{{ msg_date }}</div>
+              {% set ns.last_date = msg_date %}
+            {% endif %}
+            <div class="msg">
+              <div class="msg-avatar">{{ (msg.nickname or msg.username)[0].upper() }}</div>
+              <div class="msg-body">
+                <div class="msg-header">
+                  <span class="msg-author">{{ msg.nickname or msg.username }}</span>
+                  <span class="msg-time">{{ msg.posted_at.strftime('%I:%M %p') }}</span>
+                  {% if msg.is_edited %}
+                    <span style="font-size:11px; color:var(--text-dim); font-style:italic;">(edited)</span>
+                  {% endif %}
+                </div>
+                <div class="msg-text">{{ msg.body | e }}</div>
+                {% if msg.user_id == session.user_id %}
+                  <div style="margin-top:4px;">
+                    <a href="/messages/{{ msg.message_id }}/edit"
+                      style="font-size:12px; color:var(--text-dim); text-decoration:none;"
+                      onmouseover="this.style.color='var(--text)'"
+                      onmouseout="this.style.color='var(--text-dim)'">
+                      ✏️ Edit
+                    </a>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Message input -->
+    <div class="msg-input-area">
+      <form method="POST" action="/channels/{{ ch.channel_id }}/post" id="msg-form">
+        <div class="msg-input-box">
+          <textarea name="body" id="msg-input"
+                    placeholder="Message #{{ ch.name }}"
+                    rows="1"
+                    onkeydown="handleKey(event)"></textarea>
+          <button type="submit" class="msg-send-btn" title="Send">➤</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Auto-scroll to bottom
+  const scroll = document.getElementById('msg-scroll');
+  scroll.scrollTop = scroll.scrollHeight;
+
+  // Auto-resize textarea
+  const ta = document.getElementById('msg-input');
+  ta.addEventListener('input', () => {
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
+  });
+
+  // Submit on Enter, newline on Shift+Enter
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById('msg-form').submit();
+    }
+  }
+
+  ta.focus();
+</script>
+{% endblock %}

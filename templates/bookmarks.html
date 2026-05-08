@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Bookmarks — Snickr{% endblock %}
+
+{% block body %}
+<div style="display:flex; height:100vh; flex-direction:column;">
+  <div class="topbar">
+    <div class="topbar-title">🔖 Bookmarked Channels</div>
+    <div class="topbar-right">
+      <a href="/workspaces" class="btn btn-ghost btn-sm">← Workspaces</a>
+      <a href="/logout" class="btn btn-ghost btn-sm">Sign out</a>
+    </div>
+  </div>
+
+  <div class="content">
+    <div style="max-width:640px; margin:0 auto;">
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <ul class="flash-list">
+            {% for cat, msg in messages %}
+              <li class="flash {{ cat }}">{{ msg }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% endwith %}
+
+      {% if bookmarked_channels %}
+        <div style="display:flex; flex-direction:column; gap:12px; margin-top:8px;">
+          {% for ch in bookmarked_channels %}
+            <div class="card" style="display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+                  <span style="font-size:13px; color:var(--text-dim);">{{ ch.workspace_name }}</span>
+                  <span style="color:var(--border);">›</span>
+                  <span class="badge badge-{{ ch.type }}">{{ ch.type }}</span>
+                </div>
+                <div style="font-size:16px; font-weight:600; color:var(--text-head);">
+                  {% if ch.type == 'direct' %}@{% else %}#{% endif %}{{ ch.channel_name }}
+                </div>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <a href="/channels/{{ ch.channel_id }}" class="btn btn-primary btn-sm">Open</a>
+                <a href="/channels/{{ ch.channel_id }}/bookmark" class="btn btn-ghost btn-sm">Remove</a>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div style="text-align:center; padding:60px 20px; color:var(--text-dim);">
+          <div style="font-size:40px; margin-bottom:12px;">🔖</div>
+          <div style="font-size:16px; color:var(--text); margin-bottom:8px;">No bookmarks yet</div>
+          <div style="font-size:14px;">Open any channel and click Bookmark to save it here.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

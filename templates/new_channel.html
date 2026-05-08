@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}New Channel — Snickr{% endblock %}
+
+{% block body %}
+<div class="auth-wrap">
+  <div class="auth-box" style="max-width:480px;">
+    <div style="margin-bottom:24px;">
+      <a href="/workspaces/{{ workspace_id }}" style="font-size:13px; color:var(--text-dim);">← Back to {{ ws.name }}</a>
+    </div>
+    <div class="auth-logo" style="font-size:22px;">Create a Channel</div>
+    <div class="auth-sub">Channels are where conversations happen.</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flash-list">
+          {% for cat, msg in messages %}
+            <li class="flash {{ cat }}">{{ msg }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+      <div class="form-group">
+        <label>Channel Name</label>
+        <input type="text" name="name" placeholder="e.g. general" required autofocus>
+      </div>
+      <div class="form-group">
+        <label>Channel Type</label>
+        <select name="type">
+          <option value="public">Public — anyone in the workspace can join</option>
+          <option value="private">Private — invite only</option>
+          <option value="direct">Direct — between two people</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+        Create Channel
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

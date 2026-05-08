@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Invite to #{{ ch.name }} — Snickr{% endblock %}
+
+{% block body %}
+<div class="auth-wrap">
+  <div class="auth-box" style="max-width:480px;">
+    <div style="margin-bottom:24px;">
+      <a href="/channels/{{ ch.channel_id }}" style="font-size:13px; color:var(--text-dim);">← Back to #{{ ch.name }}</a>
+    </div>
+    <div class="auth-logo" style="font-size:22px;">Invite to Channel</div>
+    <div class="auth-sub">Invite a workspace member to join <strong style="color:var(--text);">#{{ ch.name }}</strong>.</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flash-list">
+          {% for cat, msg in messages %}
+            <li class="flash {{ cat }}">{{ msg }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" name="username" placeholder="Enter their username" required autofocus>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center;">
+        Send Invitation
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
