@@ -1,13 +1,15 @@
 from flask import Flask, render_template, request, redirect, session, url_for, flash
 import psycopg2
-import psycopg2.extras
-import bcrypt
+import psycopg2.extras # Allows query results to be returned as dictionaries
+import bcrypt # Used for hashing and checking passwords
 from dotenv import load_dotenv
 import os
+# Load environment variables from the .env file (DB_PASSWORD)
 load_dotenv()
 
 
 app = Flask(__name__)
+# Secret key is used by Flask to sign the session cookie
 app.secret_key = 'snickr_secret_key_change_in_production'
 
 # ------------------------------------------------------------------
@@ -15,13 +17,15 @@ app.secret_key = 'snickr_secret_key_change_in_production'
 # ------------------------------------------------------------------
 
 def get_db():
-     conn = psycopg2.connect(
+    # Opens a new connection to the PostgreSQL database
+    # Called at the start of every route that needs database access
+    conn = psycopg2.connect(
         dbname="snickr",
         user="postgres",
-        password=os.getenv('DB_PASSWORD'), #password protected in .env file
+        password=os.getenv('DB_PASSWORD'),  # Read from .env file
         host="localhost"
     )
-    conn.autocommit = False
+    conn.autocommit = False  # Requires explicit conn.commit() to save changes
     return conn
 
 
@@ -37,6 +41,8 @@ def require_login():
 
 @app.route('/')
 def index():
+    # Root route — redirects logged in users to workspaces,
+    # everyone else to the login page
     if 'user_id' in session:
         return redirect(url_for('workspaces'))
     return redirect(url_for('login'))
@@ -45,20 +51,25 @@ def index():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
+        # Read form fields submitted by the user
         email    = request.form.get('email', '').strip()
         username = request.form.get('username', '').strip()
         nickname = request.form.get('nickname', '').strip()
         password = request.form.get('password', '')
 
+        #all required fields must be filled in
         if not email or not username or not password:
             flash('Email, username, and password are required.', 'error')
             return render_template('register.html')
 
+        # Hash the password using bcrypt before storing it
         pw_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
         conn = get_db()
         cur = conn.cursor()
         try:
+            # Insert the new user into the users table
+            # %s placeholders are parameterized to prevent SQL injection
             cur.execute(
                 "INSERT INTO users (email, username, nickname, password_hash) VALUES (%s, %s, %s, %s)",
                 (email, username, nickname, pw_hash)
@@ -67,6 +78,7 @@ def register():
             flash('Account created! Please log in.', 'success')
             return redirect(url_for('login'))
         except psycopg2.errors.UniqueViolation:
+            # Triggered if the email or username already exists in the database
             conn.rollback()
             flash('Email or username already taken.', 'error')
         finally:
@@ -83,13 +95,19 @@ def login():
         password = request.form.get('password', '')
 
         conn = get_db()
+        # RealDictCursor returns rows as dictionaries (e.g. user['email'])
+        # instead of tuples (e.g. user[0])
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Look up the user by email using a parameterized query
         cur.execute("SELECT * FROM users WHERE email = %s", (email,))
         user = cur.fetchone()
         cur.close()
         conn.close()
 
         if user and bcrypt.checkpw(password.encode('utf-8'), user['password_hash'].encode('utf-8')):
+            # Password matches — store user info in the session cookie
+            # user_id is cast to int to ensure type consistency when comparing in templates
             session['user_id']  = int(user['user_id'])
             session['username'] = user['username']
             session['nickname'] = user['nickname'] or user['username']
@@ -102,6 +120,7 @@ def login():
 
 @app.route('/logout')
 def logout():
+    # Clear the session cookie to logout
     session.clear()
     return redirect(url_for('login'))
 
@@ -117,6 +136,8 @@ def workspaces():
 
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    # Fetch all workspaces the logged in user is a member of
+    # Joins workspaces and workspace_members to check membership
     cur.execute("""
         SELECT w.workspace_id, w.name, w.description, w.created_at,
                wm.is_admin
@@ -128,6 +149,7 @@ def workspaces():
     my_workspaces = cur.fetchall()
 
     # Pending workspace invitations
+    # accepted_at IS NULL means the invitation has not been accepted yet
     cur.execute("""
         SELECT wi.invitation_id, w.name AS workspace_name, u.username AS invited_by_name
         FROM workspace_invitations wi
@@ -158,11 +180,15 @@ def new_workspace():
         conn = get_db()
         cur = conn.cursor()
         try:
+            # Insert the new workspace and get back the auto-generated workspace_id
+            # RETURNING workspace_id is a PostgreSQL feature that returns the new row's ID
             cur.execute(
                 "INSERT INTO workspaces (name, description, creator_id) VALUES (%s, %s, %s) RETURNING workspace_id",
                 (name, description, session['user_id'])
             )
             workspace_id = cur.fetchone()[0]
+            # Automatically add the creator as an admin member
+            # Transaction that is rolled back if one fails
             cur.execute(
                 "INSERT INTO workspace_members (workspace_id, user_id, is_admin) VALUES (%s, %s, TRUE)",
                 (workspace_id, session['user_id'])
@@ -198,21 +224,23 @@ def workspace(workspace_id):
     cur.execute("SELECT * FROM workspaces WHERE workspace_id = %s", (workspace_id,))
     ws = cur.fetchone()
 
-    # Channels visible to this user
+    # Fetch channels visible to this user:
+    # Public channels are visible to all workspace members
+    # Private and direct channels are only visible if the user is a channel member
     cur.execute("""
         SELECT c.channel_id, c.name, c.type,
-               EXISTS(SELECT 1 FROM channel_members cm WHERE cm.channel_id = c.channel_id AND cm.user_id = %s) AS is_member
+            EXISTS(SELECT 1 FROM channel_members cm WHERE cm.channel_id = c.channel_id AND cm.user_id = %s) AS is_member
         FROM channels c
         WHERE c.workspace_id = %s
-          AND (
+        AND (
             c.type = 'public'
             OR EXISTS(SELECT 1 FROM channel_members cm WHERE cm.channel_id = c.channel_id AND cm.user_id = %s)
-          )
+        )
         ORDER BY c.type, c.name
     """, (session['user_id'], workspace_id, session['user_id']))
     channels = cur.fetchall()
 
-    # Admins
+    # Fetch all admins for display in the workspace header
     cur.execute("""
         SELECT u.username FROM workspace_members wm
         JOIN users u ON u.user_id = wm.user_id
@@ -220,7 +248,7 @@ def workspace(workspace_id):
     """, (workspace_id,))
     admins = cur.fetchall()
 
-    # Pending channel invitations for this user in this workspace
+    # Fetch any pending channel invitations for this user in this workspace
     cur.execute("""
         SELECT ci.invitation_id, c.name AS channel_name, c.channel_id
         FROM channel_invitations ci
@@ -229,11 +257,21 @@ def workspace(workspace_id):
     """, (session['user_id'], workspace_id))
     channel_invites = cur.fetchall()
 
+    # Fetch all members for the make admin feature
+    # Only fetches non-admin members so the admin cannot promote someone who is already an admin
+    cur.execute("""
+        SELECT u.user_id, u.username FROM workspace_members wm
+        JOIN users u ON u.user_id = wm.user_id
+        WHERE wm.workspace_id = %s AND wm.is_admin = FALSE
+    """, (workspace_id,))
+    non_admin_members = cur.fetchall()
+
     cur.close()
     conn.close()
     return render_template('workspace.html', ws=ws, channels=channels,
                            membership=membership, admins=admins,
-                           channel_invites=channel_invites)
+                           channel_invites=channel_invites,
+                           non_admin_members=non_admin_members)
 
 
 @app.route('/workspaces/<int:workspace_id>/invite', methods=['GET', 'POST'])
@@ -244,7 +282,7 @@ def invite_to_workspace(workspace_id):
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    # Only admins can invite
+    # # Only admins are allowed to invite users to a workspace
     cur.execute("SELECT is_admin FROM workspace_members WHERE workspace_id = %s AND user_id = %s",
                 (workspace_id, session['user_id']))
     mem = cur.fetchone()
@@ -258,6 +296,7 @@ def invite_to_workspace(workspace_id):
     if request.method == 'POST':
         invitee_username = request.form.get('username', '').strip()
         cur2 = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        #Look up the invitee by username
         cur2.execute("SELECT user_id FROM users WHERE username = %s", (invitee_username,))
         invitee = cur2.fetchone()
 
@@ -265,6 +304,8 @@ def invite_to_workspace(workspace_id):
             flash('User not found.', 'error')
         else:
             try:
+                # Insert the invitation record into workspace_invitations
+                # accepted_at will be NULL until the user accepts
                 cur2.execute("""
                     INSERT INTO workspace_invitations (workspace_id, invited_user_id, invited_by)
                     VALUES (%s, %s, %s)
@@ -318,6 +359,48 @@ def accept_workspace_invite(invitation_id):
 
 
 # ------------------------------------------------------------------
+# Make admin
+# ------------------------------------------------------------------
+
+@app.route('/workspaces/<int:workspace_id>/make_admin', methods=['POST'])
+def make_admin(workspace_id):
+    redir = require_login()
+    if redir: return redir
+
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    # Only the workspace creator can promote others to admin
+    # We check that the logged in user is both an admin AND the original creator
+    cur.execute("SELECT * FROM workspaces WHERE workspace_id = %s", (workspace_id,))
+    ws = cur.fetchone()
+
+    if not ws or int(ws['creator_id']) != int(session['user_id']):
+        flash('Only the workspace owner can promote admins.', 'error')
+        cur.close()
+        conn.close()
+        return redirect(url_for('workspace', workspace_id=workspace_id))
+
+    # Get the user_id of the member being promoted from the form
+    target_user_id = request.form.get('user_id', type=int)
+
+    if target_user_id:
+        # Update is_admin to TRUE for the target member
+        # Only updates if the target is actually a member of this workspace
+        cur.execute("""
+            UPDATE workspace_members
+            SET is_admin = TRUE
+            WHERE workspace_id = %s AND user_id = %s
+        """, (workspace_id, target_user_id))
+        conn.commit()
+        flash('User has been made an admin.', 'success')
+
+    cur.close()
+    conn.close()
+    return redirect(url_for('workspace', workspace_id=workspace_id))
+
+
+# ------------------------------------------------------------------
 # Channels
 # ------------------------------------------------------------------
 
@@ -329,6 +412,7 @@ def new_channel(workspace_id):
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
+    # Any workspace member can create a channel
     cur.execute("SELECT * FROM workspace_members WHERE workspace_id = %s AND user_id = %s",
                 (workspace_id, session['user_id']))
     if not cur.fetchone():
@@ -339,6 +423,7 @@ def new_channel(workspace_id):
     ws = cur.fetchone()
 
     if request.method == 'POST':
+        # Normalize the channel name to lowercase with hyphens instead of spaces
         name         = request.form.get('name', '').strip().lower().replace(' ', '-')
         channel_type = request.form.get('type', 'public')
 
@@ -346,16 +431,20 @@ def new_channel(workspace_id):
             flash('Channel name is required.', 'error')
         else:
             try:
+                # Insert the channel and get back the new channel_id
                 cur.execute("""
                     INSERT INTO channels (workspace_id, name, type, creator_id)
                     VALUES (%s, %s, %s, %s) RETURNING channel_id
                 """, (workspace_id, name, channel_type, session['user_id']))
                 channel_id = cur.fetchone()['channel_id']
+                
+                # Automatically add the creator as a channel member
                 cur.execute("INSERT INTO channel_members (channel_id, user_id) VALUES (%s, %s)",
                             (channel_id, session['user_id']))
                 conn.commit()
                 return redirect(url_for('channel', channel_id=channel_id))
             except psycopg2.errors.UniqueViolation:
+                # Triggered by the UNIQUE(workspace_id, name) constraint on channels
                 conn.rollback()
                 flash('A channel with that name already exists.', 'error')
             except Exception:
@@ -590,15 +679,18 @@ def toggle_bookmark(channel_id):
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
+    # Check if a bookmark already exists for this user and channel
     cur.execute("SELECT 1 FROM bookmarks WHERE user_id = %s AND channel_id = %s",
                 (session['user_id'], channel_id))
     exists = cur.fetchone()
 
     if exists:
+        # Bookmark exists, remove it (toggle off)
         cur.execute("DELETE FROM bookmarks WHERE user_id = %s AND channel_id = %s",
                     (session['user_id'], channel_id))
         flash('Bookmark removed.', 'success')
     else:
+        # Bookmark does not exist, add it (toggle on)
         cur.execute("INSERT INTO bookmarks (user_id, channel_id) VALUES (%s, %s)",
                     (session['user_id'], channel_id))
         flash('Channel bookmarked.', 'success')
@@ -617,6 +709,7 @@ def bookmarks():
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
+    # Fetch all channels bookmarked by this user, most recently bookmarked first
     cur.execute("""
         SELECT c.channel_id, c.name AS channel_name, c.type,
                w.name AS workspace_name, w.workspace_id
@@ -642,6 +735,8 @@ def search():
     redir = require_login()
     if redir: return redir
 
+    # Search parameters come from the URL query string (e.g. /search?q=hello&workspace_id=1)
+    # This is a GET request so parameters are in request.args, not request.form
     keyword      = request.args.get('q', '').strip()
     workspace_id = request.args.get('workspace_id', type=int)
     results      = []
@@ -662,6 +757,7 @@ def search():
         if workspace_id:
             params.append(workspace_id)
 
+        # Fetch all workspaces the user belongs to for the filter dropdown
         cur.execute(f"""
             SELECT m.body, m.posted_at, u.username, c.name AS channel_name,
                    w.name AS workspace_name, c.channel_id
